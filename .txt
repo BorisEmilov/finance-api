@@ -1,0 +1,54 @@
+app.get('/search/:searchQuery', async (req, res) => {
+    try {
+        const { searchQuery } = req.params
+        let movie = [];
+        const html = await new Promise((resolve, reject) => {
+            request(`https://www.imdb.com/find/?q=${searchQuery}`, function (
+                error,
+                response,
+                html
+            ) {
+                if (error) reject(error);
+                else resolve(html);
+            });
+        });
+
+        const $ = cheerio.load(html);
+        // movies search list
+        $('.sc-17bafbdb-2.ffAEHI .ipc-metadata-list li').each((index, element) => {
+            const movieObj = { id: '', title: '', released: '', casting: [], poster: '' }
+            const regex = /\/title\/([a-zA-Z0-9]+)/;
+
+            const poster = $(element).find('.sc-daafffbc-0.eBTIIV .ipc-media img').attr('src');
+            const title = $(element).find('.ipc-metadata-list-summary-item__tc a').text().trim();
+            const released = $(element).find('.ipc-metadata-list-summary-item__tc .ipc-metadata-list-summary-item__tl li').text().trim();
+            const casting = $(element).find('.ipc-metadata-list-summary-item__tc .ipc-metadata-list-summary-item__stl li').text().trim();
+
+            const movieId = $(element).find('.ipc-metadata-list-summary-item__tc a').attr('href');
+            if(movieId != undefined){
+                const matchId = movieId.match(regex);
+                if (matchId && matchId[1]) {
+                    const movieId = matchId[1];
+                    movieObj.id = movieId
+                }
+            }
+
+            const castArray = casting.split(", ")
+
+            movieObj.casting = castArray
+            movieObj.released = released
+            movieObj.title = title
+            movieObj.poster = poster
+            if (title !== '') {
+                movie.push(movieObj)
+            }
+        })
+
+
+
+        res.json(movie);
+    } catch (error) {
+        console.log('An error occurred:', error);
+        res.status(500).json({ error: 'An error occurred' });
+    }
+});
